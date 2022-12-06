@@ -1,19 +1,11 @@
 const mysql = require("mysql2")
-
-const { json } = require("express")
-const e = require("express")
-const bcrypt = require("bcrypt")
-const jwt = require("jsonwebtoken")
-const { errorMonitor } = require("events")
-const { rmSync } = require("fs")
-const key = "ksjdskjdskmdksmdk"
-// config, config({ path: path.join(__dirname, "..", " .env") })
-
+const config = require("dotenv")
+config.config({ path: "./config/config.env" })
 const db = mysql.createConnection({
-  user: "root",
-  host: "localhost",
-  password: "0491830YUze",
-  database: "users"
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_DATABASE
 })
 
 //Get one Application

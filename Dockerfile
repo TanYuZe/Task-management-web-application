@@ -1,14 +1,18 @@
-FROM 18-alpine
+FROM alpine:latest
 
-WORKDIR /app
+WORKDIR /server
 
-COPY package*.json  /app
+RUN apk add npm
 
-RUN npm install && cache clean --force
+COPY package.json .
 
-COPY . /app
+RUN npm install && npm cache clean --force
 
-USER node
+COPY . .
+
+RUN addgroup -S nonroot && adduser -S default -G nonroot
+
+USER default
 
 EXPOSE 5000
 
