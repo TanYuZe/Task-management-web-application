@@ -575,6 +575,13 @@ exports.checktaskstate = async taskid => {
 //
 //A3
 exports.createtask = async (req, res, next) => {
+  try{
+    const requiredKeys = ["app_acronym", "task_name", "task_plan", "task_description", "task_notes", "username", "password"]
+      const hasAllkeys = Object.keys(req.body).every((key)=> requiredKeys.includes(key))
+      if(!hasAllkeys)
+      {
+        return res.status(422).send({status: 422})
+      }
   const { app_acronym, task_name, task_plan, task_description, task_notes, username, password } = req.body
   let url = req.url.includes("?")
   var regex = /^[A-Za-z0-9 ]+$/
@@ -586,7 +593,7 @@ exports.createtask = async (req, res, next) => {
       res.status(422).send({ status: 422}) //without mandatory parameters
     } else {
       //   console.log("here")
-      db.query("SELECT * FROM users.user_info WHERE (BINARY username= ?)", [username], async (error, result) => {
+      db.query("SELECT * FROM users.user_info WHERE (username= ?)", [username], async (error, result) => {
         if (error) {
           res.status(500).send({ status: 500}) //server error status
         } else if (result.length === 0) {
@@ -598,7 +605,7 @@ exports.createtask = async (req, res, next) => {
             const hash = result[0].password
             const results = await bcrypt.compare(password, hash)
             if (!results) {
-              res.status(401).send({ status: 401, errormsg: "invalid credentials" })
+              res.status(401).send({ status: 401})//invalid credentials
             } else {
               const appData = await getOneApp(app_acronym)
               if (appData === undefined) {
@@ -642,20 +649,33 @@ exports.createtask = async (req, res, next) => {
     }
   }
 }
+catch(error)
+{
+  res.status(422).send({status:422})
+}
+}
 //A3 GetTaskbystate
 exports.GetTaskbyState = async (req, res, next) => {
+  try{
+    const requiredKeys = ["task_state", "app_acronym", "username", "password"]
+      const hasAllkeys = Object.keys(req.body).every((key)=> requiredKeys.includes(key))
+      if(!hasAllkeys)
+      {
+        return res.status(422).send({status: 422})
+      }
   const { task_state, app_acronym, username, password } = req.body
+  
   let url = req.url.includes("?")
   var regex = /^[A-Za-z0-9 ]+$/
 
   if (!regex.test(url) || url) {
-    res.send({ status: 400, errormsg: "bad request" })
+    res.send({ status: 400})
   } else {
     if (username === "" || task_state === "" || password === "") {
       res.status(422).send({ status: 422 }) //without mandatory parameters
     } else {
       //   console.log("here")
-      db.query("SELECT * FROM users.user_info WHERE (BINARY username= ?)", [username], async (error, result) => {
+      db.query("SELECT * FROM users.user_info WHERE (username= ?)", [username], async (error, result) => {
         if (error) {
           res.status(500).send({ status: 500}) //server error status
         } else if (result.length === 0) {
@@ -673,8 +693,9 @@ exports.GetTaskbyState = async (req, res, next) => {
               if (appData === undefined) {
                 res.status(412).send({ status: 412 }) //invalid application id
               } else {
+                state = task_state.toLowerCase()
                 //double check
-                if (task_state === "open" || task_state === "todolist" || task_state === "doing" || task_state === "done" || task_state === "close") {
+                if (state === "open" || state === "todolist" || state === "doing" || state === "done" || state === "close") {
                   db.query("SELECT * FROM users.task WHERE Task_state= ? AND Task_app_Acronym= ?", [task_state, app_acronym], async (error, result) => {
                     if (error) {
                       res.status(500).send({status: 500, error}) //server error status
@@ -698,14 +719,28 @@ exports.GetTaskbyState = async (req, res, next) => {
     }
   }
 }
+catch(error)
+{
+  res.status(422).send({status:422})
+}
+}
 
 //promotetasktodone
 exports.PromoteTaskToDone = async (req, res, next) => {
+  try{
+  const requiredKeys = ["task_id", "task_notes", "username", "password"]
+    const hasAllkeys = Object.keys(req.body).every((key)=> requiredKeys.includes(key))
+    if(!hasAllkeys)
+    {
+      return res.status(422).send({status: 422})
+    }
+  
+  
   const { task_id, task_notes, username, password } = req.body
-
+  var updateNote
   let url = req.url.includes("?")
   var regex = /^[A-Za-z0-9 ]+$/
-
+  var date = createDateTime()
   if (!regex.test(url) || url) {
     res.send({ status: 400})//bad request
   } else {
@@ -723,8 +758,20 @@ exports.PromoteTaskToDone = async (req, res, next) => {
           if (!results) {
             res.status(401).send({ status: 401})//invalid credentials
           } else {
+            db.query("SELECT * FROM users.task WHERE (Task_id= ?)", [task_id], async (error, result) => {
+              if (error) {
+                res.status(500).send({ status: 500}) //server error status
+              } else if (result.length === 0) {
+                res.status(412).send({ status: 412}) //taskid does not exist
+              }
+              else{
             const result = await this.getAppfromtaskid(task_id)
-
+            if(result.Task_app_Acronym === undefined)
+            {
+              res.status(412).send({ status: 412})
+            }
+            else
+            {
             const checkrights = await this.checkDoingDonerights(result.Task_app_Acronym)
             const application = result.Task_app_Acronym
             const doingrights = checkrights.App_permit_Doing.replaceAll('"', "")
@@ -741,16 +788,23 @@ exports.PromoteTaskToDone = async (req, res, next) => {
                   res.status(412).send({ status: 412}) //taskid does not exist
                 } else {
                   taskstate = result[0].Task_state
+                  var taskname = result[0].Task_name
                   if (taskstate !== "doing") {
                     res.status(413).send({ status: 413}) //Task is not of the correct state (i.e. task is not at the 'doing' stage
                   } else {
-                    db.query("UPDATE task SET Task_state = ?, Task_notes =?  WHERE (Task_id= ?)", ["done",task_notes, task_id], async (error, result) => {
+                    updateNote = JSON.stringify(`[${username}] moved "${taskname}" to Done on ${date} \nPrevious State: doing Task State: Done Notes: ${task_notes}\n\n`)
+                    console.log(updateNote)
+                    var state = "done"
+                    let sql = `UPDATE task SET Task_state = ${JSON.stringify(state)} , 
+                    Task_notes = CONCAT(${updateNote}, Task_notes), task_owner = ${JSON.stringify(username)} WHERE (Task_id = ${JSON.stringify(task_id)})`
+                    db.query(sql,  (error, result) => {
                       if (error) {
-                        res.status(500).send({ status: 500}) //server error status
+                        res.status(500).send({ status: 500, error}) //server error status
                       } else if (result.length == 0) {
                         res.status(405).send({ status: 405}) //state is not valid
                       } else {
                         res.status(200).send({ status: 200})
+                        
                         sendDoneTaskEmail(username, task_id, application, donerights)
                         //success code
                       }
@@ -762,9 +816,18 @@ exports.PromoteTaskToDone = async (req, res, next) => {
           }
         }
       })
+        }}
+      })
     }
+  
   }
 }
+catch(error)
+{
+  res.status(422).send({status:422})
+}
+}
+
 
 
 

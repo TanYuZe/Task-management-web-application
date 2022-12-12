@@ -33,7 +33,7 @@ app.use((req, res) => {
 }
 else
 {
-  return res.status(404).send({ status: 404 , errormsg: "invalid API endpoint"})
+  return res.status(404).send({ status: 404})//invalid api endpoint
 }
 })
 // app.use((req, res, next) =>{
@@ -44,12 +44,12 @@ else
 // })
 app.use((req, res, next)=>
 {
-  let checkURL = req.url.includes("?")
-  console.log(checkURL)
+  let checkURL = req.path.replace("/", "")
+  
     
-if(checkURL)
+if(checkURL !== "GetTaskByState" || checkURL !== "PromoteTaskToDone" || checkURL !== "CreateTasks")
 {
-  return res.status(400).send({code:400})
+  return res.status(404).send({code:404})
 }
 next()
 })
@@ -64,11 +64,11 @@ next()
 //   }
 //   if(err)
 //   {
-//     res.json({message : "Bad Request", code :404})
+//     res.json({message : "Bad Request", code :400})
 //   }
 //   next()
 // })
 
-app.listen(3001, () => {
-  console.log("Yey, your server is running on port 3001")
+app.listen(4001, () => {
+  console.log("Yey, your server is running on port 4001")
 })
